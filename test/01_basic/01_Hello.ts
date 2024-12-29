@@ -8,6 +8,7 @@ async function fixture() {
     return { contract }
 }
 
+
 describe("Hello", function () {
     it("The str should be equal to hello ", async function () {
         const { contract } = await loadFixture(fixture)
