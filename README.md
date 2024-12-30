@@ -10,3 +10,6 @@
 8. npx hardhat run                        运行指定的 JavaScript 脚本，常用于部署合约等操作。     npx hardhat run ./scripts/deploy.js
 9. npx hardhat test                       执行位于 ./test/ 目录下的测试脚本，通常使用 Mocha 框架
 10. npx hardhat node                      启动一个本地的测试区块链，方便开发和测试。
+
+# 常用的依赖
+1. npm install @openzeppelin/contracts

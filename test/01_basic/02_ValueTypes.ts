@@ -1,7 +1,8 @@
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers"
 import { ethers } from "hardhat"
 import { expect } from "chai"
-import { ValueTypes } from "../../typechain-types/01_basic/02_ValueTypes.sol"
+import { ValueTypes } from "../../typechain-types"
+
 
 const fixture = async () => {
     const factory = await ethers.getContractFactory("ValueTypes")
