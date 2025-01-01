@@ -76,3 +76,51 @@
   第三种，智能合约中定义了 receive 或者 fallback 函数，外部可以通过钱包或者转账函数直接存入合约。
 
 16. Solidity 访问控制有哪些，有什么用？  
+
+
+17. 以太坊什么机制阻止了无限循环的永远运行？  
+  阻止运行无限循环的机制是 Gas 限制。每个以太坊上的交易都需要消耗 Gas  
+  如果交易执行过程中超过了发送者为该交易提供的 Gas 限制，执行将停止，交易会被 revert。  
+  另外，以太坊区块也有一个最大 Gas 限额，所以每个区块也只能包含有限量的计算。超过这个限额，交易就会被终止。
+  补充：  
+  以太坊区块的最大 Gas 限额 是动态的，会随着网络的需求而变化  
+  每个区块的最大 Gas 限额是由前一个区块的 Gas 限额决定的，调整幅度最多为前一个区块限额的 +/- 12.5%。
+  ```javascript
+  const { ethers } = require("ethers");
+  const provider = new ethers.providers.JsonRpcProvider("https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID");
+
+  async function getGasLimit() {
+      const block = await provider.getBlock("latest");
+      console.log("Current Block Gas Limit:", block.gasLimit.toString());
+  }
+  ```
+18. 在一个智能合约中调用另一个智能合约时可以转发多少 gas？  
+  当一个智能合约调用另一个智能合约的函数时，可以附带一个可选的 gas 参数，用于指定发送交易时转发的 gas 数量。  
+  如果没有指定 gas 数量，Solidity 默认会将当前交易剩余的 gas 全部转发给被调用的合约。 
+
+  信任问题： 在调用外部合约时，建议限制 Gas 传递，以防止恶意合约滥用 Gas 消耗。  
+  重入攻击： 显式限制 Gas 可以减少重入攻击的风险，但不能完全防止。建议结合其他安全措施（例如使用 checks-effects-interactions 模式）。  
+  Gas 的合理估算： 对于调用的外部合约，最好对其 Gas 消耗有一定的预估，从而避免因 Gas 不足导致的调用失败。  
+  ```javascript
+   contract A {
+      function callBWithGas(address bAddress) public {
+         B(bAddress).someFunction{gas: 50000}();             // 显式指定转发的 Gas 数量
+      }
+
+      function callB(address bAddress) public {
+         B(bAddress).someFunction();                         // 默认将剩余 Gas 转发给 B
+      }
+   }
+  ```
+
+19. ERC20 合约中的 transfer 和 transferFrom 有什么区别？  
+  transfer：将代币从调用者（msg.sender）的余额中直接转账到指定的 to 地址。用于用户直接转账代币  
+  transferFrom：将代币从 from 的余额中转账到 recipient 地址，但前提是第三方调用者已被授权，用于第三方操作代币，例如 DEX 使用用户的代币进行交易  
+  ```javascript
+   function transfer(address to, uint256 amount) public returns (bool);
+   function transferFrom(address from, address recipient, uint256 amount) public returns (bool);
+  ```
+
+20. 在区块链上如何使用随机数？  
+  由于区块链要求确定性，所有节点的数据必须达成一致，而且是公开的。所以，在智能合约中生成的随机数，任何人都是可以预测的，无法实现真正的随机性。  
+  通常需要外部预言机提供真正的随机数，比如chainlink，或者通过未来某个区块上的数据来实现。  
