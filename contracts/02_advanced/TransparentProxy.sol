@@ -102,7 +102,7 @@ contract Proxy {
         
         Store(store).setResult(result);
 
-        // 触发事件
+        // 触发事件, 将函数的返回值通过事件 (ResultStored) 记录下来
         emit ResultStored(result);
 
         // 将返回的数据返回给调用者

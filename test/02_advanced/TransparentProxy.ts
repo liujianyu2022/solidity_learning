@@ -1,4 +1,4 @@
-import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers"
+import { loadFixture, impersonateAccount, stopImpersonatingAccount } from "@nomicfoundation/hardhat-toolbox/network-helpers"
 import { ethers } from "hardhat"
 import { expect } from "chai"
 import { LogicV1, LogicV2, Store, Proxy } from "../../typechain-types"
@@ -26,15 +26,13 @@ describe("Transparent Proxy", function () {
     let admin: any
     let other: any
 
+
     beforeEach(async () => {
 
         // 相当于 foundry 中的 vm.startPrank()
         const signers = await ethers.getSigners()
         admin = signers[0]
         other = signers[1]
-
-        console.log("admin = ", admin.address)
-        console.log("other = ", other.address)
 
         const { logicV1Factory, logicV2Factory, storeFactory, proxyFactory } = await loadFixture(fixture)
 
@@ -51,70 +49,107 @@ describe("Transparent Proxy", function () {
         proxyAddress = await proxy.getAddress()
     })
 
-    it("logicV1", async () => {
+    it("admin cannot call logic functions directly", async () => {
+        const sumCalldata = logicV1.interface.encodeFunctionData("sum", [10, 20])
 
-        // 编码调用逻辑合约 sum(int256,int256)
-        const sumCalldata = logicV1.interface.encodeFunctionData("sum", [10, 20]);
+        // sendTransaction 返回的是一个 Promise，而 expect 可以直接对 Promise 进行断言
+        const transactionPromise = admin.sendTransaction({
+            to: proxyAddress,
+            data: sumCalldata
+        })
 
-        console.log("admin = ", admin.address)
-        console.log("other = ", other.address)
+        await expect(transactionPromise).to.be.revertedWith("Admin cannot directly call logic functions");
+    })
 
-        // 使用 call 代替 sendTransaction，确保调用者是非管理员账户
-        // const result = await other.provider!.call({
+    it("other user can call logic functions and store result", async () => {
+        const sumCalldata = logicV1.interface.encodeFunctionData("sum", [10, 20])
+
+        await ethers.provider.send("hardhat_impersonateAccount", [other.address])           // 模拟 'other' 账户的身份, 这是方式1
+
+        // call 是只读操作，虽然可以获取返回值，但是不会触发状态变更, 它不会修改链上状态。
+        // 因此，Store 合约中的 setResult 函数不会被调用，result 变量也不会被更新
+        // const result = await otherSigner.call({
         //     to: proxyAddress,
         //     data: sumCalldata,
-        // });
+        // })
 
-        // 通过非 admin 账户（other）发起调用
-        // const result = await other.sendTransaction({
-        //     to: proxyAddress, // 目标地址是 Proxy 合约
-        //     data: sumCalldata, // 编码后的方法和参数
-        // });
-
-        // 模拟 'other' 账户的身份
-        await ethers.provider.send("hardhat_impersonateAccount", [other.address]);
-
-        // 获取 'other' 账户的签名
-        const otherSigner = await ethers.getSigner(other.address);
-
-        // 使用 'other' 账户发送交易
-        // const result = await otherSigner.sendTransaction({
-        //     to: proxyAddress,   // 目标地址是 Proxy 合约
-        //     data: sumCalldata,  // 编码后的方法和参数
-        // });
-
-        const result = await otherSigner.call({
+        // sendTransaction 会触发状态变更，但是不能直接获取函数调用的返回值
+        // 因此需要结合event一起进行验证
+        const tx = await other.sendTransaction({                                          // 使用 'other' 账户发送交易
             to: proxyAddress,
             data: sumCalldata,
-        });
+        })
 
-        // 等待交易被挖掘
-        // await result.wait();
+        const receipt = await tx.wait()                                                    // 等待交易上链
 
-        // 解码返回的数据
-        const decodedResult = logicV1.interface.decodeFunctionResult("sum", result);
-
-
-
-        // // 解码返回的数据
-        // const decodedResult = logicV1.interface.decodeFunctionResult("sum", result);
-
-        // 获取 store 中保存的结果
         const storedResult = await store.getResult()
+        expect(storedResult).to.equal(10 + 20)
 
-        console.log("storedResult = ", storedResult)
-        console.log("result = ", result)
+        // 解析事件日志，获取返回值
+        const eventTopic = ethers.id("ResultStored(int256)")
+        const eventLog = receipt.logs.find((log: any) => log.topics[0] === eventTopic)
 
-        // 监听 ResultStored 事件
-        const logs = await ethers.provider.getLogs({
-            address: proxyAddress,
-            topics: [ethers.id("ResultStored(int256)")]
-        });
-        console.log("Event logs:", logs);
+        expect(eventLog).to.not.be.undefined;                                              // 确保事件被触发
 
-        // 确认逻辑正确性
-        expect(decodedResult[0]).to.equal(30); // 10 + 20
-        // expect(storedResult).to.equal(30);
+        const decodedEvent = proxy.interface.decodeEventLog(                               // 解码事件数据
+            "ResultStored",
+            eventLog!.data,
+            eventLog!.topics
+        );
+
+        expect(decodedEvent.result).to.equal(10 + 20)                                     // 确认事件中的返回值是否正确
+    })
+
+
+    it("other user cannot upgrade the logic contract", async () => {
+        await ethers.provider.send("hardhat_impersonateAccount", [other.address]);
+
+        // await expect(
+        //     proxy.connect(other).upgrade(logicV2Address)
+        // ).to.be.revertedWith("You are not the admin")
+
+        // 下面这是一个合约调用，但它实际上返回的是一个 Transaction Response（即一个 Promise）
+        const upgradePromise = proxy.connect(other).upgrade(logicV1Address)
+
+        await expect(upgradePromise).to.be.revertedWith("You are not the admin")
+    })
+
+
+    it("admin can upgrade the logic contract", async () => {
+        await proxy.connect(admin).upgrade(logicV2Address)                                // 指定 admin 来发送交易
+
+        const newLogic = await proxy.logic()
+        expect(newLogic).to.equal(logicV2Address)
+
+        const subCalldata = logicV2.interface.encodeFunctionData("sub", [10, 20])
+
+        await impersonateAccount(other.address)                                         // 模拟 other 用户地址，这是方式2
+
+        // sendTransaction 会触发状态变更, 但无法直接获取返回值
+        const tx = await other.sendTransaction({                                        // 使用 'other' 账户发送交易
+            to: proxyAddress,
+            data: subCalldata
+        })
+
+        const receipt = await tx.wait()
+        const storedResult = await store.getResult();
+
+        expect(storedResult).to.equal(10 - 20)
+
+        const eventTopic = ethers.id("ResultStored(int256)")
+        const eventLog = receipt.logs.find((log: any) => log.topics[0] === eventTopic)
+
+        expect(eventLog).to.not.be.undefined;                                              // 确保事件被触发
+
+        const decodedEvent = proxy.interface.decodeEventLog(                               // 解码事件数据
+            "ResultStored",
+            eventLog!.data,
+            eventLog!.topics
+        );
+
+        expect(decodedEvent.result).to.equal(10 - 20)                                      // 确认事件中的返回值是否正确
+
+        await stopImpersonatingAccount(other.address)                                      // 停止模拟 other 用户地址
     })
 
 })
