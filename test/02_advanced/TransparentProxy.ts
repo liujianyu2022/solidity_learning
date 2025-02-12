@@ -64,7 +64,7 @@ describe("Transparent Proxy", function () {
     it("other user can call logic functions and store result", async () => {
         const sumCalldata = logicV1.interface.encodeFunctionData("sum", [10, 20])
 
-        await ethers.provider.send("hardhat_impersonateAccount", [other.address])           // 模拟 'other' 账户的身份, 这是方式1
+        // await ethers.provider.send("hardhat_impersonateAccount", [other.address])           // 模拟 'other' 账户的身份, 这是方式1
 
         // call 是只读操作，虽然可以获取返回值，但是不会触发状态变更, 它不会修改链上状态。
         // 因此，Store 合约中的 setResult 函数不会被调用，result 变量也不会被更新
@@ -123,7 +123,7 @@ describe("Transparent Proxy", function () {
 
         const subCalldata = logicV2.interface.encodeFunctionData("sub", [10, 20])
 
-        await impersonateAccount(other.address)                                         // 模拟 other 用户地址，这是方式2
+        // await impersonateAccount(other.address)                                         // 模拟 other 用户地址，这是方式2
 
         // sendTransaction 会触发状态变更, 但无法直接获取返回值
         const tx = await other.sendTransaction({                                        // 使用 'other' 账户发送交易
@@ -149,7 +149,7 @@ describe("Transparent Proxy", function () {
 
         expect(decodedEvent.result).to.equal(10 - 20)                                      // 确认事件中的返回值是否正确
 
-        await stopImpersonatingAccount(other.address)                                      // 停止模拟 other 用户地址
+        // await stopImpersonatingAccount(other.address)                                      // 停止模拟 other 用户地址
     })
 
 })
