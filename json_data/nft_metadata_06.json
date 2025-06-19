@@ -1,0 +1,16 @@
+{
+    "description": "nft_01",
+    "external_url": "https://openseacreatures.io/3",
+    "image": "https://ipfs.filebase.io/ipfs/QmSsLgzBMuMZAtGdt4Z6wj1yvbEiG1uE4qHp55bnWLMQga",
+    "name": "nft_01",
+    "attributes": [
+        {
+            "trait_type": "color",
+            "value": "06"
+        },
+        {
+            "trait_type": "appearance",
+            "value": "cool"
+        }
+    ]
+}
