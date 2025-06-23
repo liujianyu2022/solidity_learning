@@ -21,7 +21,8 @@ contract MyNFT is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Burnable, Ow
 
     }
 
-    function safeMint(address to) public onlyOwner returns (uint256){
+    // 注意：这里需要权限控制
+    function safeMint(address to) public returns (uint256){
         uint256 tokenId = _nextTokenId++;
         _safeMint(to, tokenId);
         _setTokenURI(tokenId, METADATA);

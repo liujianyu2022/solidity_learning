@@ -9,19 +9,16 @@ import {CCIPReceiver} from "@chainlink/contracts-ccip/src/v0.8/ccip/applications
 import {IERC20} from "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {MyNFT} from "../01_basic/05_MyNFT.sol";
+import {WrappedMyNFT} from "./WrappedMyNFT.sol";
 
 // CCIP： https://docs.chain.link/ccip
 // CCIP:  https://docs.chain.link/ccip/tutorials/evm/send-arbitrary-data      // 任意数据的跨链
 
-/**
- * THIS IS AN EXAMPLE CONTRACT THAT USES HARDCODED VALUES FOR CLARITY.
- * THIS IS AN EXAMPLE CONTRACT THAT USES UN-AUDITED CODE.
- * DO NOT USE THIS CODE IN PRODUCTION.
- */
+
+
 
 /// @title - A simple messenger contract for sending/receiving string data across chains.
-contract NFTPoolLockAndRelease is CCIPReceiver, OwnerIsCreator {
+contract NFTPoolBurnAndMint is CCIPReceiver, OwnerIsCreator {
     using SafeERC20 for IERC20;
 
     // Custom errors to provide more descriptive revert messages.
@@ -29,10 +26,6 @@ contract NFTPoolLockAndRelease is CCIPReceiver, OwnerIsCreator {
     error NothingToWithdraw(); // Used when trying to withdraw Ether but there's nothing to withdraw.
     error FailedToWithdrawEth(address owner, address target, uint256 value); // Used when the withdrawal of Ether fails.
     error InvalidReceiverAddress(); // Used when the receiver address is 0.
-
-    // error DestinationChainNotAllowlisted(uint64 destinationChainSelector); // Used when the destination chain has not been allowlisted by the contract owner.
-    // error SourceChainNotAllowlisted(uint64 sourceChainSelector); // Used when the source chain has not been allowlisted by the contract owner.
-    // error SenderNotAllowlisted(address sender); // Used when the sender has not been allowlisted by the contract owner.
     
 
     // Event emitted when a message is sent to another chain.
@@ -45,15 +38,7 @@ contract NFTPoolLockAndRelease is CCIPReceiver, OwnerIsCreator {
         uint256 fees // The fees paid for sending the CCIP message.
     );
 
-    // Event emitted when a message is received from another chain.
-    event MessageReceived(
-        bytes32 indexed messageId, // The unique ID of the CCIP message.
-        uint64 indexed sourceChainSelector, // The chain selector of the source chain.
-        address sender, // The address of the sender from the source chain.
-        string text // The text that was received.
-    );
-
-    event TokenUnlocked(
+    event WrappedTokenMinted (
         uint256 tokenId,
         address newOwner
     );
@@ -61,51 +46,21 @@ contract NFTPoolLockAndRelease is CCIPReceiver, OwnerIsCreator {
     bytes32 private s_lastReceivedMessageId; // Store the last received messageId.
     string private s_lastReceivedText; // Store the last received text.
 
-    // Mapping to keep track of allowlisted destination chains.          能往哪个链去发送
-    // mapping(uint64 => bool) public allowlistedDestinationChains;
-
-    // Mapping to keep track of allowlisted source chains.               能接收哪个链发过来的
-    // mapping(uint64 => bool) public allowlistedSourceChains;
-
-    // Mapping to keep track of allowlisted senders.                     指定特定的sender，表示只接收这些sender发送的
-    // mapping(address => bool) public allowlistedSenders;
-
-
     IERC20 private s_linkToken;
-    MyNFT public myNFT;
+    WrappedMyNFT public wrappedMyNFT;
 
     struct RequestData {
         uint256 tokenId;
         address newOwner;
     }
 
-   
-
     /// @notice Constructor initializes the contract with the router address.
     /// @param _router The address of the router contract.
     /// @param _link The address of the link contract.
-    constructor(address _router, address _link, address _myNFTAddress) CCIPReceiver(_router) {
+    constructor(address _router, address _link, address _wrappedMyNFTAddress) CCIPReceiver(_router) {
         s_linkToken = IERC20(_link);
-        myNFT = MyNFT(_myNFTAddress);
+        wrappedMyNFT = WrappedMyNFT(_wrappedMyNFTAddress);
     }
-
-    /// @dev Modifier that checks if the chain with the given destinationChainSelector is allowlisted.
-    /// @param _destinationChainSelector The selector of the destination chain.
-    // modifier onlyAllowlistedDestinationChain(uint64 _destinationChainSelector) {
-    //     if (!allowlistedDestinationChains[_destinationChainSelector])
-    //         revert DestinationChainNotAllowlisted(_destinationChainSelector);
-    //     _;
-    // }
-
-    /// @dev Modifier that checks if the chain with the given sourceChainSelector is allowlisted and if the sender is allowlisted.
-    /// @param _sourceChainSelector The selector of the destination chain.
-    /// @param _sender The address of the sender.
-    // modifier onlyAllowlisted(uint64 _sourceChainSelector, address _sender) {
-    //     if (!allowlistedSourceChains[_sourceChainSelector])
-    //         revert SourceChainNotAllowlisted(_sourceChainSelector);
-    //     if (!allowlistedSenders[_sender]) revert SenderNotAllowlisted(_sender);
-    //     _;
-    // }
 
     /// @dev Modifier that checks the receiver address is not 0.
     /// @param _receiver The receiver address.
@@ -115,11 +70,14 @@ contract NFTPoolLockAndRelease is CCIPReceiver, OwnerIsCreator {
     }
 
     // 发送需要让 CCIP 收到的数据
-    function lockAndSendNFT(uint256 tokenId, address newOwner, uint64 chainSelector, address receiver) public returns(bytes32) {
-        // 1. 转移并且锁定 NFT      
-        myNFT.transferFrom(msg.sender, address(this), tokenId);                 // from, to, tokenId
+    function burnAndSendNFT(uint256 tokenId, address newOwner, uint64 chainSelector, address receiver) public returns(bytes32) {
+        // 1. 转移 WNFT      
+        wrappedMyNFT.transferFrom(msg.sender, address(this), tokenId);                 // from, to, tokenId
 
-        // 2. 构造需要发送的数据
+        // 2. 烧掉 WNFT
+        wrappedMyNFT.burn(tokenId);
+
+        // 3. 构造需要发送的数据
         bytes memory payload = abi.encode(tokenId, newOwner);
 
         bytes32 messageId = sendMessagePayLINK(chainSelector, receiver, payload);
@@ -127,20 +85,6 @@ contract NFTPoolLockAndRelease is CCIPReceiver, OwnerIsCreator {
         return messageId;
     }
 
-    /// @dev Updates the allowlist status of a destination chain for transactions.
-    // function allowlistDestinationChain(uint64 _destinationChainSelector, bool allowed) external onlyOwner {
-    //     allowlistedDestinationChains[_destinationChainSelector] = allowed;
-    // }
-
-    /// @dev Updates the allowlist status of a source chain for transactions.
-    // function allowlistSourceChain(uint64 _sourceChainSelector, bool allowed) external onlyOwner {
-    //     allowlistedSourceChains[_sourceChainSelector] = allowed;
-    // }
-
-    /// @dev Updates the allowlist status of a sender for transactions.
-    // function allowlistSender(address _sender, bool allowed) external onlyOwner {
-    //     allowlistedSenders[_sender] = allowed;
-    // }
 
     /// @notice Sends data to receiver on the destination chain.
     /// @notice Pay for fees in LINK.
@@ -149,17 +93,7 @@ contract NFTPoolLockAndRelease is CCIPReceiver, OwnerIsCreator {
     /// @param _receiver The address of the recipient on the destination blockchain.
     /// @param _payload The data to be sent.
     /// @return messageId The ID of the CCIP message that was sent.
-    function sendMessagePayLINK(
-        uint64 _destinationChainSelector,
-        address _receiver,
-        bytes memory _payload
-    )
-        internal
-        // onlyOwner
-        // onlyAllowlistedDestinationChain(_destinationChainSelector)
-        // validateReceiver(_receiver)
-        returns (bytes32 messageId)
-    {
+    function sendMessagePayLINK(uint64 _destinationChainSelector, address _receiver, bytes memory _payload)internal returns (bytes32 messageId){
         // Create an EVM2AnyMessage struct in memory with necessary information for sending a cross-chain message
         Client.EVM2AnyMessage memory evm2AnyMessage = _buildCCIPMessage(
             _receiver,
@@ -209,9 +143,6 @@ contract NFTPoolLockAndRelease is CCIPReceiver, OwnerIsCreator {
         bytes memory _payload
     )
         external
-        // onlyOwner
-        // onlyAllowlistedDestinationChain(_destinationChainSelector)
-        // validateReceiver(_receiver)
         returns (bytes32 messageId)
     {
         // Create an EVM2AnyMessage struct in memory with necessary information for sending a cross-chain message
@@ -251,23 +182,14 @@ contract NFTPoolLockAndRelease is CCIPReceiver, OwnerIsCreator {
     }
 
     /// handle a received message
-    function _ccipReceive(Client.Any2EVMMessage memory any2EvmMessage) internal override
-        // onlyAllowlisted(
-        //     any2EvmMessage.sourceChainSelector,
-        //     abi.decode(any2EvmMessage.sender, (address))
-        // ) // Make sure source chain and sender are allowlisted
-    {
+    function _ccipReceive(Client.Any2EVMMessage memory any2EvmMessage) internal override{
         RequestData memory requestData = abi.decode(any2EvmMessage.data, (RequestData));
         address newOwner = requestData.newOwner;
         uint256 tokenId = requestData.tokenId;
 
-        // 解锁 NFT
-        myNFT.transferFrom(address(this), newOwner, tokenId);
+        wrappedMyNFT.mintTokenWithSpecificTokenId(newOwner, tokenId);               // mint WNFT
 
-        emit TokenUnlocked(
-            tokenId,
-            newOwner
-        );
+        emit WrappedTokenMinted(tokenId, newOwner);
     }
 
     /// @notice Construct a CCIP message.
@@ -299,11 +221,7 @@ contract NFTPoolLockAndRelease is CCIPReceiver, OwnerIsCreator {
     /// @notice Fetches the details of the last received message.
     /// @return messageId The ID of the last received message.
     /// @return text The last received text.
-    function getLastReceivedMessageDetails()
-        external
-        view
-        returns (bytes32 messageId, string memory text)
-    {
+    function getLastReceivedMessageDetails() external view returns (bytes32 messageId, string memory text){
         return (s_lastReceivedMessageId, s_lastReceivedText);
     }
 
@@ -347,3 +265,8 @@ contract NFTPoolLockAndRelease is CCIPReceiver, OwnerIsCreator {
         IERC20(_token).safeTransfer(_beneficiary, amount);
     }
 }
+
+
+
+
+
