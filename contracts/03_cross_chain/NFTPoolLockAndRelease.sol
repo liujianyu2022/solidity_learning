@@ -14,11 +14,6 @@ import {MyNFT} from "../01_basic/05_MyNFT.sol";
 // CCIP： https://docs.chain.link/ccip
 // CCIP:  https://docs.chain.link/ccip/tutorials/evm/send-arbitrary-data      // 任意数据的跨链
 
-/**
- * THIS IS AN EXAMPLE CONTRACT THAT USES HARDCODED VALUES FOR CLARITY.
- * THIS IS AN EXAMPLE CONTRACT THAT USES UN-AUDITED CODE.
- * DO NOT USE THIS CODE IN PRODUCTION.
- */
 
 /// @title - A simple messenger contract for sending/receiving string data across chains.
 contract NFTPoolLockAndRelease is CCIPReceiver, OwnerIsCreator {
@@ -80,7 +75,6 @@ contract NFTPoolLockAndRelease is CCIPReceiver, OwnerIsCreator {
     }
 
    
-
     /// @notice Constructor initializes the contract with the router address.
     /// @param _router The address of the router contract.
     /// @param _link The address of the link contract.

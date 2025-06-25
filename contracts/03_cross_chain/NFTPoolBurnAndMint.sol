@@ -15,8 +15,6 @@ import {WrappedMyNFT} from "./WrappedMyNFT.sol";
 // CCIP:  https://docs.chain.link/ccip/tutorials/evm/send-arbitrary-data      // 任意数据的跨链
 
 
-
-
 /// @title - A simple messenger contract for sending/receiving string data across chains.
 contract NFTPoolBurnAndMint is CCIPReceiver, OwnerIsCreator {
     using SafeERC20 for IERC20;

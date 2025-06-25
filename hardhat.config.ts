@@ -8,10 +8,10 @@ const PRIVATE_KEY = "f7892aa15aedf66b36f617ef80478e7ed1bb79fc9789d4c54123e59a83a
 const config: HardhatUserConfig = {
   networks: {
     hardhat: {},
-    sepolia: {
-      url: ALCHEMY_ETH_SEPOLIA_URL,
-      accounts: [PRIVATE_KEY]
-    }
+    // sepolia: {
+    //   url: ALCHEMY_ETH_SEPOLIA_URL,
+    //   accounts: [PRIVATE_KEY]
+    // }
   },
 
   solidity: {
