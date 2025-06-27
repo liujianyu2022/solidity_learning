@@ -88,8 +88,19 @@ describe("CrossChain", () => {
             await ccipContract.requestLinkFromFaucet(wNftPoolContract, ethers.parseEther("10"))         // 获取link
             await wNftPoolContract.burnAndSendNFT(0, owner, chainSelector, nftPoolContract)             // burn wNft
 
-            
+            // 由于此时 wNft 列表为空了，因此不能 await wNftContract.ownerOf(0)。
+            // 否则会报错  VM Exception while processing transaction: reverted with custom error 'ERC721NonexistentToken(0)'
+            // const realOwner1 = await wNftContract.ownerOf(0)
 
+            // 检测 WNFT 被 Burn
+            const totalSupply = await wNftContract.totalSupply()
+            const expcetedSupply = 0
+            expect(totalSupply).to.equal(expcetedSupply)
+
+            // 检测 NFT 是否被 unlock
+            const realOwner = await nftContract.ownerOf(0)
+            const expectedOwner = await owner.getAddress()
+            expect(realOwner).to.equal(expectedOwner)
         })
     })
 })
